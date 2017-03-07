@@ -98,8 +98,10 @@ static int TYPE_PORT_MODE = 0;
 enum {PORT_MODE_SBP, PORT_MODE_NMEA};
 static u8 uart0_mode = PORT_MODE_SBP;
 static u8 uart1_mode = PORT_MODE_SBP;
+static u8 usb_mode = PORT_MODE_SBP;
 static pid_t uart0_adapter_pid = 0;
 static pid_t uart1_adapter_pid = 0;
+static pid_t usb_adapter_pid = 0;
 
 bool port_mode_notify(struct setting *s, const char *val)
 {
@@ -123,6 +125,11 @@ bool port_mode_notify(struct setting *s, const char *val)
     opts = "";
     opts_sbp = "-f sbp --filter-out sbp --filter-out-config /etc/uart1_filter_out_config";
     pid = &uart1_adapter_pid;
+  } else if (s->addr == &usb_mode) {
+    dev = "/dev/ttyGS0";
+    opts = "";
+    opts_sbp = "-f sbp --filter-out sbp --filter-out-config /etc/usb_filter_out_config";
+    pid = &usb_adapter_pid;
   } else {
     return false;
   }
@@ -461,6 +468,7 @@ int main(void)
   SETTING_NOTIFY("uart1", "baudrate", uart1_baudrate, TYPE_INT, baudrate_notify);
   SETTING_NOTIFY("uart0", "mode", uart0_mode, TYPE_PORT_MODE, port_mode_notify);
   SETTING_NOTIFY("uart1", "mode", uart1_mode, TYPE_PORT_MODE, port_mode_notify);
+  SETTING_NOTIFY("usb", "mode", usb_mode, TYPE_PORT_MODE, port_mode_notify);
 
   TYPE_IP_MODE = settings_type_register_enum(ip_mode_enum, &ip_mode_settings_type);
   SETTING_NOTIFY("ethernet", "ip_config_mode", eth_ip_mode, TYPE_IP_MODE, eth_ip_mode_notify);
