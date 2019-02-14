@@ -132,7 +132,6 @@ static ssize_t ept_cdev_write(struct file *p_file,
     }
 
     /* TODO: support non-blocking write */
-    //dev_info(ept_params->device, "File IO -> %u 0x%p %d\n", ept_params->addr, ept_params->tx_buff, size);
     retval = rpmsg_sendto(ept_params->rpmsg_dev->ept, ept_params->tx_buff, size, ept_params->addr);
 
     if (retval) {
@@ -264,7 +263,7 @@ static const struct file_operations ept_cdev_fops = {
   .release = ept_cdev_release,
 };
 
-static int ept_rpmsg_default_cb(struct rpmsg_device *___rpdev,
+static int ept_rpmsg_default_cb(struct rpmsg_device *rpdev,
                                  void *data,
                                  int len,
                                  void *priv,
@@ -273,7 +272,7 @@ static int ept_rpmsg_default_cb(struct rpmsg_device *___rpdev,
     return 0;
 }
 
-static int ept_rpmsg_cb(struct rpmsg_device *___rpdev, void *data, int len, void *priv, u32 src)
+static int ept_rpmsg_cb(struct rpmsg_device *rpdev, void *data, int len, void *priv, u32 src)
 {
   struct ept_params *ept_params = priv;
   int len_in;
@@ -281,7 +280,7 @@ static int ept_rpmsg_cb(struct rpmsg_device *___rpdev, void *data, int len, void
   /* Do not write zero-length records to the FIFO, as this would
    * cause read() to return zero, aka EOF */
   if (len == 0) {
-    dev_info(&___rpdev->dev, "Dropping zero-length message.\n");
+    dev_info(&rpdev->dev, "Dropping zero-length message.\n");
     return 0;
   }
 
@@ -297,8 +296,8 @@ static int ept_rpmsg_cb(struct rpmsg_device *___rpdev, void *data, int len, void
   return 0;
 }
 
-static int drv_probe(struct rpmsg_device *___rpdev);
-static void drv_remove(struct rpmsg_device *___rpdev);
+static int drv_probe(struct rpmsg_device *rpdev);
+static void drv_remove(struct rpmsg_device *rpdev);
 
 static const struct rpmsg_device_id rpmsg_dev_id_table[] = {
   {.name = CHANNEL_NAME},
@@ -314,11 +313,9 @@ static struct rpmsg_driver rpmsg_driver = {
   .callback = ept_rpmsg_default_cb,
 };
 
-static int ept_rpmsg_setup(struct ept_params *ept_params, struct rpmsg_device *___rpdev)
+static int ept_rpmsg_setup(struct ept_params *ept_params, struct rpmsg_device *rpdev)
 {
   int retval;
-
-  dev_info(&___rpdev->dev, "rpmsg_piksi: ept_rpmsg_setup(%u,%u,%u)\n",ept_params->addr, ___rpdev->src,___rpdev->dst);
 
   /* Acquire TX / rpmsg lock */
   retval = mutex_lock_interruptible(&ept_params->tx_rpmsg_lock);
@@ -326,18 +323,18 @@ static int ept_rpmsg_setup(struct ept_params *ept_params, struct rpmsg_device *_
     return retval;
   }
 
-  ept_params->rpmsg_dev = ___rpdev;
+  ept_params->rpmsg_dev = rpdev;
 
   struct rpmsg_channel_info info;
   info.dst = RPMSG_ADDR_ANY;
   info.src = ept_params->addr;
-  strncpy(info.name, ___rpdev->id.name, RPMSG_NAME_SIZE);
+  strncpy(info.name, rpdev->id.name, RPMSG_NAME_SIZE);
 
   /* Create rpmsg endpoint */
   ept_params->rpmsg_ept =
     rpmsg_create_ept(ept_params->rpmsg_dev, ept_rpmsg_cb, ept_params, info);
   if (ept_params->rpmsg_ept == NULL) {
-    dev_err(&___rpdev->dev, "Failed to create rpmsg endpoint.\n");
+    dev_err(&rpdev->dev, "Failed to create rpmsg endpoint.\n");
     retval = -ENODEV;
     goto done_locked;
   }
@@ -392,6 +389,7 @@ static int ept_cdev_setup(struct ept_params *ept_params, dev_t dev, u32 addr)
     printk(KERN_ERR "Failed to create device.\n");
     goto error1;
   }
+
   goto out;
 
 error1:
@@ -417,30 +415,28 @@ static void ept_cdevs_remove(struct dev_params *dev_params)
   }
 }
 
-static void startup_message_send(struct rpmsg_device *___rpdev)
+static void startup_message_send(struct rpmsg_device *rpdev)
 {
   char msg[] = "startup";
-  rpmsg_send(___rpdev->ept, msg, strlen(msg));
+  rpmsg_send(rpdev->ept, msg, strlen(msg));
 }
 
-static int drv_probe(struct rpmsg_device *___rpdev)
+static int drv_probe(struct rpmsg_device *rpdev)
 {
   int i;
   int status;
 
-  dev_info(&___rpdev->dev, "rpmsg_piksi: drv_probe\n");
-
   if (probed) {
-    dev_err(&___rpdev->dev, "Already attached.\n");
+    dev_err(&rpdev->dev, "Already attached.\n");
     return -ENODEV;
   }
   probed = true;
 
-  dev_set_drvdata(&___rpdev->dev, dev_params);
+  dev_set_drvdata(&rpdev->dev, dev_params);
 
   /* Create and attach rpmsg endpoints */
   for (i = 0; i < NUM_ENDPOINTS; i++) {
-    status = ept_rpmsg_setup(&dev_params->epts[i], ___rpdev);
+    status = ept_rpmsg_setup(&dev_params->epts[i], rpdev);
     if (status) {
       /* Remove any endpoints that were successfully set up */
       while (--i >= 0) {
@@ -450,15 +446,15 @@ static int drv_probe(struct rpmsg_device *___rpdev)
     }
   }
 
-  startup_message_send(___rpdev);
+  startup_message_send(rpdev);
 
   return 0;
 }
 
-static void drv_remove(struct rpmsg_device *___rpdev)
+static void drv_remove(struct rpmsg_device *rpdev)
 {
   int i;
-  struct dev_params *dev_params = dev_get_drvdata(&___rpdev->dev);
+  struct dev_params *dev_params = dev_get_drvdata(&rpdev->dev);
 
   for (i = 0; i < NUM_ENDPOINTS; i++) {
     ept_rpmsg_remove(&dev_params->epts[i]);
@@ -471,8 +467,6 @@ static int __init init(void)
 {
   int i;
   int status;
-
-  printk("rpmsg_piksi: init()\n");
 
   /* Initialize device params structure */
   dev_params = kzalloc(sizeof(struct dev_params), GFP_KERNEL);
@@ -514,7 +508,6 @@ static int __init init(void)
     goto error4;
   }
 
-  printk("rpmsg_piksi: init() return\n");
   goto out;
 
 error4:
