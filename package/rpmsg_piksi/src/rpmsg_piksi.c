@@ -264,12 +264,12 @@ static const struct file_operations ept_cdev_fops = {
 };
 
 static int ept_rpmsg_default_cb(struct rpmsg_device *rpdev,
-                                 void *data,
-                                 int len,
-                                 void *priv,
-                                 u32 src)
+                                void *data,
+                                int len,
+                                void *priv,
+                                u32 src)
 {
-    return 0;
+  return 0;
 }
 
 static int ept_rpmsg_cb(struct rpmsg_device *rpdev, void *data, int len, void *priv, u32 src)
@@ -331,8 +331,7 @@ static int ept_rpmsg_setup(struct ept_params *ept_params, struct rpmsg_device *r
   strncpy(info.name, rpdev->id.name, RPMSG_NAME_SIZE);
 
   /* Create rpmsg endpoint */
-  ept_params->rpmsg_ept =
-    rpmsg_create_ept(ept_params->rpmsg_dev, ept_rpmsg_cb, ept_params, info);
+  ept_params->rpmsg_ept = rpmsg_create_ept(ept_params->rpmsg_dev, ept_rpmsg_cb, ept_params, info);
   if (ept_params->rpmsg_ept == NULL) {
     dev_err(&rpdev->dev, "Failed to create rpmsg endpoint.\n");
     retval = -ENODEV;
