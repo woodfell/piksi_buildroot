@@ -313,10 +313,10 @@ docker-make-sdk:
 sdk:
 	$(BUILD_ENV_ARGS) \
 		$(MAKE) -C buildroot O=output V=$(V) sdk
-	@echo '>>>' Uninstalling piksi toolchain wrappers...
-	$(MAKE) -C buildroot force-uninstall-toolchain-wrappers
-	@echo '>>>' Creating SDK archive...
-	tar -cJf piksi_sdk.txz -C buildroot/output/host .
+#@echo '>>>' Uninstalling piksi toolchain wrappers...
+#$(MAKE) -C buildroot force-uninstall-toolchain-wrappers
+#@echo '>>>' Creating SDK archive...
+#tar -cJf piksi_sdk.txz -C buildroot/output/host .
 
 define _pull_ccache
 	( DOWNLOAD_PBR_CCACHE=y PBR_TARGET=$(1) ./fetch_firmware.sh && \
